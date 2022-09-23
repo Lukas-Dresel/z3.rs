@@ -203,6 +203,12 @@ impl<'ctx> PartialEq for FuncDecl<'ctx> {
 }
 impl<'ctx> Eq for FuncDecl<'ctx> { }
 
+impl<'ctx> Hash for FuncDecl<'ctx> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_dynamic().hash(state)
+    }
+}
+
 impl<'ctx> fmt::Display for FuncDecl<'ctx> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let p = unsafe { Z3_func_decl_to_string(self.ctx.z3_ctx, self.z3_func_decl) };

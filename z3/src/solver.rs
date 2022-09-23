@@ -163,7 +163,7 @@ impl<'ctx> Solver<'ctx> {
     /// # See also:
     ///
     /// - [`Solver::check()`]
-    pub fn check_assumptions(&self, assumptions: &[ast::Bool<'ctx>]) -> SatResult {
+    pub fn check_assumptions(&self, assumptions: &[&ast::Bool<'ctx>]) -> SatResult {
         let a: Vec<Z3_ast> = assumptions.iter().map(|a| a.z3_ast).collect();
         match unsafe {
             Z3_solver_check_assumptions(self.ctx.z3_ctx, self.z3_slv, a.len() as u32, a.as_ptr())
