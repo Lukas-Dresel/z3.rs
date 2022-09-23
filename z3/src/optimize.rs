@@ -140,7 +140,7 @@ impl<'ctx> Optimize<'ctx> {
     /// # See also:
     ///
     /// - [`Optimize::get_model()`]
-    pub fn check(&self, assumptions: &[Bool<'ctx>]) -> SatResult {
+    pub fn check(&self, assumptions: &[&Bool<'ctx>]) -> SatResult {
         let assumptions: Vec<Z3_ast> = assumptions.iter().map(|a| a.z3_ast).collect();
         match unsafe {
             Z3_optimize_check(
