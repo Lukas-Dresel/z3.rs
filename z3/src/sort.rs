@@ -170,10 +170,10 @@ impl<'ctx> Sort<'ctx> {
         }
     }
 
-    pub fn bv_size(&self) -> Option<usize> {
+    pub fn bv_size(&self) -> Option<u32> {
         match self.kind() {
             SortKind::BV => Some(unsafe {
-                Z3_get_bv_sort_size(self.ctx.z3_ctx, self.z3_sort).try_into().unwrap()
+                Z3_get_bv_sort_size(self.ctx.z3_ctx, self.z3_sort)
             }),
             _ => None
         }

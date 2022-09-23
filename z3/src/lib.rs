@@ -77,7 +77,7 @@ pub struct Config {
 ///
 /// - [`Config`]
 /// - [`Context::new()`]
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Hash)]
 pub struct Context {
     z3_ctx: Z3_context,
 }
