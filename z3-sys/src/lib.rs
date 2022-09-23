@@ -4929,7 +4929,7 @@ extern "C" {
         num_decls: ::std::os::raw::c_uint,
         decl_names: *const Z3_symbol,
         decls: *const Z3_func_decl,
-    ) -> Z3_ast;
+    ) -> Z3_ast_vector;
 
     /// Similar to [`Z3_parse_smtlib2_string`], but reads the benchmark from a file.
     pub fn Z3_parse_smtlib2_file(
@@ -4941,7 +4941,7 @@ extern "C" {
         num_decls: ::std::os::raw::c_uint,
         decl_names: *const Z3_symbol,
         decls: *const Z3_func_decl,
-    ) -> Z3_ast;
+    ) -> Z3_ast_vector;
 
     /// Parse and evaluate and SMT-LIB2 command sequence. The state from a previous
     /// call is saved so the next evaluation builds on top of the previous call.
@@ -6535,9 +6535,17 @@ extern "C" {
     ///
     /// # See also:
     ///
+    /// - [`Z3_optimize_assert_and_track`]
     /// - [`Z3_optimize_assert_soft`]
     pub fn Z3_optimize_assert(c: Z3_context, o: Z3_optimize, a: Z3_ast);
 
+    /// Assert the hard constraint `a` into the optimization context, and track it using the Boolean constant `t`.
+    ///
+    /// # See also:
+    ///
+    /// - [`Z3_optimize_assert`]
+    /// - [`Z3_optimize_assert_soft`]
+    pub fn Z3_optimize_assert_and_track(c: Z3_context, o: Z3_optimize, a: Z3_ast, t: Z3_ast);
     /// Assert soft constraint to the optimization context.
     /// - `c`: - context
     /// - `o`: - optimization context
@@ -6548,6 +6556,7 @@ extern "C" {
     /// # See also:
     ///
     /// - [`Z3_optimize_assert`]
+    /// - [`Z3_optimize_assert_and_track`]
     pub fn Z3_optimize_assert_soft(
         c: Z3_context,
         o: Z3_optimize,

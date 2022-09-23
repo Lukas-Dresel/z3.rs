@@ -1,6 +1,6 @@
 //! Abstract syntax tree (AST).
 
-use std::cmp::{Eq, PartialEq};
+use std::cmp::{Eq, PartialEq, Ord, Ordering, PartialOrd};
 use std::convert::{TryFrom, TryInto};
 use std::ffi::{CStr, CString};
 use std::fmt;
@@ -344,6 +344,22 @@ pub trait Ast<'ctx>: fmt::Debug {
         }
     }
 
+    fn get_ast_id(&self) -> u32 {
+        unsafe { Z3_get_ast_id(self.get_ctx().z3_ctx, self.get_z3_ast()) }
+    }
+
+    fn get_ast_hash(&self) -> u32 {
+        unsafe { Z3_get_ast_hash(self.get_ctx().z3_ctx, self.get_z3_ast()) }
+    }
+
+    fn is_well_sorted(&self) -> bool {
+        unsafe { Z3_is_well_sorted(self.get_ctx().z3_ctx, self.get_z3_ast()) }
+    }
+
+    fn typechecks(&self) -> bool {
+        self.is_well_sorted()
+    }
+
     /// Return `true` if this is a Z3 function application.
     ///
     /// Note that constants are function applications with 0 arguments.
@@ -426,6 +442,18 @@ macro_rules! impl_ast {
             }
         }
 
+        impl<'ctx> PartialOrd for $ast<'ctx> {
+            fn partial_cmp(&self, other: &$ast) -> Option<Ordering> {
+                Some(self.get_ast_id().cmp(&other.get_ast_id()))
+            }
+        }
+
+        impl<'ctx> Ord for $ast<'ctx> {
+            fn cmp(&self, other: &$ast) -> Ordering {
+                self.get_ast_id().cmp(&other.get_ast_id())
+            }
+        }
+
         impl<'ctx> PartialEq for $ast<'ctx> {
             fn eq(&self, other: &$ast<'ctx>) -> bool {
                 assert_eq!(self.ctx, other.ctx);
@@ -501,7 +529,7 @@ macro_rules! impl_from_try_into_dynamic {
             type Error = std::string::String;
             fn try_from(ast: Dynamic<'ctx>) -> Result<Self, std::string::String> {
                 ast.$as_ast()
-                    .ok_or_else(|| format!("Dynamic is not of requested type: {:?}", ast))
+                    .ok_or_else(|| format!("Dynamic ast {:?} is not of requested type, requested {:?}", ast, stringify!($as_ast)))
             }
         }
     };
@@ -1201,6 +1229,19 @@ impl<'ctx> BV<'ctx> {
                 Some(tmp)
             } else {
                 None
+            }
+        }
+    }
+    pub fn as_numeral_string(&self) -> Option<std::string::String> {
+        unsafe {
+            let strp = Z3_get_numeral_string(self.ctx.z3_ctx, self.z3_ast);
+            if strp.is_null() {
+                None
+            }
+            else {
+                let s = CStr::from_ptr(strp).to_str().unwrap();
+                let s = std::string::String::from(s);
+                return Some(s)
             }
         }
     }

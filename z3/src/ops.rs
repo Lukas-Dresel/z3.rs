@@ -3,10 +3,11 @@ use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
     Mul, MulAssign, Neg, Not, Rem, RemAssign, Shl, ShlAssign, Sub, SubAssign,
 };
+use std::convert::TryInto;
 
 macro_rules! mk_const_bv {
     ($constant:expr, $function:ident, $val:expr, $other:expr) => {
-        $constant = BV::$function($other.get_ctx(), $val, $other.get_size());
+        $constant = BV::$function($other.get_ctx(), $val, $other.get_size().try_into().unwrap());
     };
 }
 

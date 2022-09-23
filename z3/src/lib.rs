@@ -4,6 +4,7 @@
 
 #![allow(clippy::unreadable_literal)]
 #![deny(missing_debug_implementations)]
+#![feature(stmt_expr_attributes)]
 
 #[macro_use]
 extern crate log;
@@ -15,9 +16,12 @@ extern crate num;
 
 use std::ffi::CString;
 use z3_sys::*;
-pub use z3_sys::{AstKind, GoalPrec, SortKind};
+pub use z3_sys::{AstKind, GoalPrec, SortKind, AstPrintMode};
 
 pub mod ast;
+mod ast_vector;
+mod ast_map;
+pub mod ast_visitor;
 mod config;
 mod context;
 pub mod datatype_builder;
@@ -35,6 +39,10 @@ mod sort;
 mod statistics;
 mod symbol;
 mod tactic;
+mod util;
+pub mod logging;
+
+pub use func_decl::DeclParam;
 
 pub use statistics::{StatisticsEntry, StatisticsValue};
 
@@ -173,6 +181,18 @@ pub struct FuncDecl<'ctx> {
 pub struct RecFuncDecl<'ctx> {
     ctx: &'ctx Context,
     z3_func_decl: Z3_func_decl,
+}
+
+/// Ast vector.
+pub struct AstVector<'ctx> {
+    ctx: &'ctx Context,
+    z3_ast_vector: Z3_ast_vector,
+}
+
+/// Mapping from ast::Ast to ast::AST
+pub struct AstMap<'ctx> {
+    ctx: &'ctx Context,
+    z3_ast_map: Z3_ast_map,
 }
 
 pub use z3_sys::DeclKind;

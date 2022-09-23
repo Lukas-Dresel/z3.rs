@@ -69,6 +69,10 @@ impl Config {
         self.set_bool_param_value("proof", b);
     }
 
+    pub fn set_vcc_tracing(&mut self, b: bool) {
+        self.set_bool_param_value("trace", b);
+    }
+
     /// Enable or disable model generation.
     ///
     /// # See also
@@ -83,6 +87,28 @@ impl Config {
         self.set_bool_param_value("debug_ref_count", b);
     }
 
+    pub fn set_type_checking(&mut self, b: bool) {
+        self.set_bool_param_value("well_sorted_check", b);
+    }
+
+    pub fn set_auto_configure_solver(&mut self, b: bool) {
+        self.set_bool_param_value("auto_config", b);
+    }
+
+    pub fn set_model_validation(&mut self, b: bool) {
+        self.set_bool_param_value("model_validate", b);
+    }
+
+    pub fn set_unsat_core_generation(&mut self, b: bool) {
+        self.set_bool_param_value("unsat_core", b);
+    }
+
+    // String parameters
+    pub fn set_vcc_trace_file_name(&mut self, file_name: &str) {
+        self.set_param_value("trace_file_name", file_name);
+    }
+
+    // Integer parameters
     pub fn set_timeout_msec(&mut self, ms: u64) {
         self.set_param_value("timeout", &format!("{}", ms));
     }

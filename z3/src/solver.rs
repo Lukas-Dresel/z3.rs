@@ -1,5 +1,6 @@
 use ast;
-use ast::Ast;
+use ast::{Ast, Dynamic};
+use std::convert::TryInto;
 use std::ffi::CStr;
 use std::fmt;
 use z3_sys::*;
@@ -10,6 +11,9 @@ use SatResult;
 use Solver;
 use Statistics;
 use Symbol;
+
+use crate::AstVector;
+use crate::ast::Bool;
 
 impl<'ctx> Solver<'ctx> {
     pub(crate) unsafe fn wrap(ctx: &'ctx Context, z3_slv: Z3_solver) -> Solver<'ctx> {
@@ -187,23 +191,20 @@ impl<'ctx> Solver<'ctx> {
     ///
     /// - [`Solver::check_assumptions`]
     /// - [`Solver::assert_and_track`]
-    pub fn get_unsat_core(&self) -> Vec<ast::Bool<'ctx>> {
-        let z3_unsat_core = unsafe { Z3_solver_get_unsat_core(self.ctx.z3_ctx, self.z3_slv) };
-        if z3_unsat_core.is_null() {
-            return vec![];
+    pub fn get_unsat_core(&self) -> Vec<Bool<'ctx>> {
+        let ast_vec_opt = AstVector::retrieve(
+            self.ctx,
+            self.z3_slv,
+            &|c, s| unsafe { Z3_solver_get_unsat_core(c, s) });
+        match ast_vec_opt
+        {
+            Some(vec) => {
+                let dynamic: Vec<Dynamic<'ctx>> = vec.into();
+                dynamic.into_iter().map(|x| x.try_into().expect("unsat cores should always be Bool??")).collect()
+            },
+            None => vec![]
         }
 
-        let len = unsafe { Z3_ast_vector_size(self.ctx.z3_ctx, z3_unsat_core) };
-
-        let mut unsat_core = Vec::with_capacity(len as usize);
-
-        for i in 0..len {
-            let elem = unsafe { Z3_ast_vector_get(self.ctx.z3_ctx, z3_unsat_core, i) };
-            let elem = unsafe { ast::Bool::wrap(self.ctx, elem) };
-            unsat_core.push(elem);
-        }
-
-        unsat_core
     }
 
     /// Create a backtracking point.
@@ -258,6 +259,18 @@ impl<'ctx> Solver<'ctx> {
         } else {
             None
         }
+    }
+
+    /// Retrieve the assertions for the last [`Solver::check()`]
+    ///
+
+    pub fn get_assertions(&self) -> Vec<Bool<'ctx>> {
+        AstVector::retrieve(
+            self.ctx,
+            self.z3_slv,
+            &|c, s| unsafe { Z3_solver_get_assertions(c, s) })
+            .map(|x| x.as_vec().expect("assertions should always be Bool??"))
+            .unwrap_or(vec![])
     }
 
     /// Return a brief justification for an "unknown" result (i.e.,

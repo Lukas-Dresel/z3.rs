@@ -9,6 +9,7 @@ use Optimize;
 use SatResult;
 use Statistics;
 use Symbol;
+use crate::AstVector;
 
 #[cfg(feature = "arbitrary-size-numeral")]
 use num::{
@@ -41,6 +42,24 @@ impl<'ctx> Optimize<'ctx> {
     /// - [`Optimize::minimize()`]
     pub fn assert(&self, ast: &impl Ast<'ctx>) {
         unsafe { Z3_optimize_assert(self.ctx.z3_ctx, self.z3_opt, ast.get_z3_ast()) };
+    }
+    /// Assert a constraint `a` into the solver, and track it (in the
+    /// unsat) core using the Boolean constant `p`.
+    ///
+    /// This API is an alternative to
+    /// [`Optimize::check_assumptions()`](#method.check_assumptions)
+    /// for extracting unsat cores. Both APIs can be used in the same solver.
+    /// The unsat core will contain a combination of the Boolean variables
+    /// provided using [`Solver::assert_and_track()`](#method.assert_and_track)
+    /// and the Boolean literals provided using
+    /// [`Solver::check_assumptions()`](#method.check_assumptions).
+    ///
+    /// # See also:
+    ///
+    /// - [`Optimize::assert()`](#method.assert)
+    pub fn assert_and_track(&self, ast: &Bool<'ctx>, p: &Bool<'ctx>) {
+        debug!("assert_and_track: {:?}[tracked by {:?}]", ast, p);
+        unsafe { Z3_optimize_assert_and_track(self.ctx.z3_ctx, self.z3_opt, ast.z3_ast, p.z3_ast) };
     }
 
     /// Assert soft constraint to the optimization context.
@@ -151,22 +170,25 @@ impl<'ctx> Optimize<'ctx> {
     ///
     /// This contains maximize/minimize objectives and grouped soft constraints.
     pub fn get_objectives(&self) -> Vec<Dynamic<'ctx>> {
-        let (z3_objectives, len) = unsafe {
-            let objectives = Z3_optimize_get_objectives(self.ctx.z3_ctx, self.z3_opt);
-            let len = Z3_ast_vector_size(self.ctx.z3_ctx, objectives);
-            (objectives, len)
-        };
-
-        let mut objectives = Vec::with_capacity(len as usize);
-
-        for i in 0..len {
-            let elem = unsafe { Z3_ast_vector_get(self.ctx.z3_ctx, z3_objectives, i) };
-            let elem = unsafe { Dynamic::wrap(self.ctx, elem) };
-            objectives.push(elem);
-        }
-
-        objectives
+        AstVector::retrieve(
+            self.ctx,
+            self.z3_opt,
+            &|c, s| unsafe { Z3_optimize_get_objectives(c, s) })
+            .map(|x| x.as_vec().expect("Conversion to Dynamic should always work??"))
+            .unwrap_or(vec![])
     }
+
+    /// Retrieve the assertions for the last [`Optimize::check()`](#method.check)
+    ///
+    /// This contains hard constraints.
+    pub fn get_assertions(&self) -> Vec<Bool<'ctx>> {
+        AstVector::retrieve(
+            self.ctx,
+            self.z3_opt,
+            &|c, s| unsafe { Z3_optimize_get_assertions(c, s) })
+            .map(|x| x.as_vec().expect("assertions should always be Bool??"))
+            .unwrap_or(vec![])
+        }
 
     /// Retrieve a string that describes the last status returned by [`Optimize::check()`].
     ///
@@ -190,6 +212,20 @@ impl<'ctx> Optimize<'ctx> {
                 Z3_optimize_get_statistics(self.ctx.z3_ctx, self.z3_opt),
             )
         }
+    }
+    /// Retrieve the unsat core for the last Z3_optimize_check. The unsat core is a subset of the assumptions a.
+    ///
+    ///
+    /// # See also:
+    ///
+    /// - [`Optimize::check`](#method.check)
+    pub fn get_unsat_core(&self) -> Vec<Bool<'ctx>> {
+        AstVector::retrieve(
+            self.ctx,
+            self.z3_opt,
+            &|c, s| unsafe { Z3_optimize_get_unsat_core(c, s) })
+            .map(|x| x.as_vec().expect("unsat core should always consist of Bools??"))
+            .unwrap_or(vec![])
     }
 }
 

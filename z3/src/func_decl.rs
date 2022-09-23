@@ -1,11 +1,21 @@
 use ast;
-use ast::Ast;
+use ast::{Ast, Dynamic};
 use std::convert::TryInto;
+use std::hash::{Hash,Hasher};
 use std::ffi::CStr;
 use std::fmt;
 use z3_sys::*;
 use {Context, FuncDecl, Sort, Symbol};
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum DeclParam<'ctx> {
+    AST(ast::Dynamic<'ctx>),
+    Double(f64),
+    Int(i32),
+    Sort(Sort<'ctx>),
+    Symbol(Symbol),
+    Rational(String),
+}
 impl<'ctx> FuncDecl<'ctx> {
     pub(crate) unsafe fn wrap(ctx: &'ctx Context, z3_func_decl: Z3_func_decl) -> Self {
         Z3_inc_ref(ctx.z3_ctx, Z3_func_decl_to_ast(ctx.z3_ctx, z3_func_decl));
@@ -37,6 +47,12 @@ impl<'ctx> FuncDecl<'ctx> {
         }
     }
 
+    pub fn as_dynamic(&self) -> Dynamic<'ctx> {
+        unsafe {
+            Dynamic::wrap(self.ctx, Z3_func_decl_to_ast(self.ctx.z3_ctx, self.z3_func_decl))
+        }
+    }
+
     /// Return the number of arguments of a function declaration.
     ///
     /// If the function declaration is a constant, then the arity is `0`.
@@ -56,6 +72,87 @@ impl<'ctx> FuncDecl<'ctx> {
         unsafe { Z3_get_arity(self.ctx.z3_ctx, self.z3_func_decl) as usize }
     }
 
+    pub fn domain_size(&self) -> usize {
+        unsafe { Z3_get_domain_size(self.ctx.z3_ctx, self.z3_func_decl) as usize }
+    }
+
+    pub fn domain_at(&self, idx: usize) -> Sort {
+        unsafe {
+            Sort::wrap(self.ctx, Z3_get_domain(self.ctx.z3_ctx, self.z3_func_decl, idx as u32))
+        }
+    }
+
+    pub fn domain(&self) -> Vec<Sort> {
+        (0..self.domain_size())
+            .map(|idx| self.domain_at(idx))
+            .collect()
+    }
+    /// Return the range of the given declaration.
+    ///
+    /// If it is a constant (i.e., has zero arguments), then this
+    /// function returns the sort of the constant.
+    pub fn range(&self) -> Sort {
+        unsafe {
+            Sort::wrap(self.ctx, Z3_get_range(self.ctx.z3_ctx, self.z3_func_decl))
+        }
+    }
+    pub fn parameter_kind(&self, idx: usize) -> ParameterKind {
+        unsafe { Z3_get_decl_parameter_kind(self.ctx.z3_ctx, self.z3_func_decl, idx as u32) }
+    }
+    pub fn num_params(&self) -> usize {
+        unsafe { Z3_get_decl_num_parameters(self.ctx.z3_ctx, self.z3_func_decl) as usize }
+    }
+    pub fn parameter(&self, idx: usize) -> DeclParam {
+        let kind = self.parameter_kind(idx);
+        let c = self.ctx.z3_ctx;
+        let d = self.z3_func_decl;
+        let i = idx as u32;
+        match kind {
+            ParameterKind::AST => DeclParam::AST(
+                unsafe {
+                    ast::Dynamic::wrap(
+                        self.ctx,
+                        Z3_get_decl_ast_parameter(c, d, i)
+                    )
+                }
+            ),
+            ParameterKind::Double => DeclParam::Double(
+                unsafe { Z3_get_decl_double_parameter(c, d, i) }
+            ),
+            ParameterKind::Int => DeclParam::Int(
+                unsafe { Z3_get_decl_int_parameter(c, d, i) }
+            ),
+            ParameterKind::Sort => {
+                DeclParam::Sort(unsafe { Sort::wrap(self.ctx, Z3_get_decl_sort_parameter(c, d, i)) })
+            },
+            ParameterKind::Symbol => DeclParam::Symbol(unsafe {
+                let sym = Z3_get_decl_symbol_parameter(c, d, i);
+                let kind = Z3_get_symbol_kind(c, sym);
+                match kind {
+                    SymbolKind::Int => Symbol::Int(Z3_get_symbol_int(c, sym) as u32),
+                    SymbolKind::String => Symbol::String({
+                        let p = Z3_get_symbol_string(c, sym);
+                        assert!(!p.is_null());
+                        String::from(CStr::from_ptr(p).to_str().unwrap())
+                    })
+                }
+            }),
+            ParameterKind::Rational => DeclParam::Rational(unsafe {
+                let p = Z3_get_decl_rational_parameter(c, d, i);
+                assert!(!p.is_null());
+                String::from(CStr::from_ptr(p).to_str().unwrap())
+            }),
+            _ => {
+                println!("{:?}", kind);
+                todo!()
+            }
+        }
+    }
+    pub fn params(&self) -> Vec<DeclParam> {
+        (0..self.num_params())
+            .map(|idx| self.parameter(idx))
+            .collect()
+    }
     /// Create a constant (if `args` has length 0) or function application (otherwise).
     ///
     /// Note that `args` should have the types corresponding to the `domain` of the `FuncDecl`.
@@ -98,6 +195,13 @@ impl<'ctx> FuncDecl<'ctx> {
         }
     }
 }
+impl<'ctx> PartialEq for FuncDecl<'ctx> {
+    fn eq(&self, other: &Self) -> bool {
+        assert_eq!(self.ctx, other.ctx);
+        self.as_dynamic().z3_ast == other.as_dynamic().z3_ast
+    }
+}
+impl<'ctx> Eq for FuncDecl<'ctx> { }
 
 impl<'ctx> fmt::Display for FuncDecl<'ctx> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
@@ -115,6 +219,14 @@ impl<'ctx> fmt::Display for FuncDecl<'ctx> {
 impl<'ctx> fmt::Debug for FuncDecl<'ctx> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         <Self as fmt::Display>::fmt(self, f)
+    }
+}
+
+impl<'ctx> Clone for FuncDecl<'ctx> {
+    fn clone(&self) -> Self {
+        unsafe {
+            FuncDecl::wrap(self.ctx, self.z3_func_decl)
+        }
     }
 }
 

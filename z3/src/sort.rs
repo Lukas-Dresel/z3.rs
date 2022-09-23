@@ -170,6 +170,14 @@ impl<'ctx> Sort<'ctx> {
         }
     }
 
+    pub fn bv_size(&self) -> Option<usize> {
+        match self.kind() {
+            SortKind::BV => Some(unsafe {
+                Z3_get_bv_sort_size(self.ctx.z3_ctx, self.z3_sort).try_into().unwrap()
+            }),
+            _ => None
+        }
+    }
     /// Returns `Some(s)` where `s` is the number of significand bits if the sort
     /// is a `FloatingPoint` and `None` otherwise.
     pub fn float_significand_size(&self) -> Option<u32> {
